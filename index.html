@@ -131,6 +131,178 @@
             color: var(--orange-primary);
             border-color: var(--white);
         }
+        .navbar-data-btn {
+            display: none;
+            color: var(--white);
+            background: rgba(255,255,255,0.15);
+            border: 1.5px solid rgba(255,255,255,0.35);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-left: 4px;
+        }
+        .navbar-data-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: var(--white);
+        }
+        .navbar-data-btn.visible {
+            display: inline-block;
+        }
+
+        /* ===== OSS 设置按钮 ===== */
+        .navbar-oss-btn {
+            display: none;
+            color: var(--white);
+            background: rgba(255,255,255,0.15);
+            border: 1.5px solid rgba(255,255,255,0.35);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-left: 4px;
+        }
+        .navbar-oss-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: var(--white);
+        }
+        .navbar-oss-btn.visible {
+            display: inline-block;
+        }
+
+        /* ===== OSS 配置弹窗 ===== */
+        .oss-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+        .oss-overlay.active {
+            display: flex;
+        }
+        .oss-modal {
+            background: var(--white);
+            border-radius: var(--radius);
+            padding: 32px;
+            width: 90%;
+            max-width: 480px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .oss-modal h3 {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            color: var(--orange-primary);
+        }
+        .oss-modal .form-group {
+            margin-bottom: 16px;
+        }
+        .oss-modal label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 6px;
+        }
+        .oss-modal input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .oss-modal input:focus {
+            border-color: var(--orange-primary);
+        }
+        .oss-modal-btns {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .oss-modal-btns button {
+            flex: 1;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s;
+        }
+        .oss-save-btn {
+            background: var(--orange-gradient);
+            color: var(--white);
+        }
+        .oss-save-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .oss-test-btn {
+            background: #f0f0f0;
+            color: var(--text-dark);
+        }
+        .oss-test-btn:hover {
+            background: #e0e0e0;
+        }
+        .oss-cancel-btn {
+            background: transparent;
+            color: var(--text-light);
+            border: 1.5px solid #e0e0e0 !important;
+        }
+        .oss-status {
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+        }
+        .oss-status.success {
+            display: block;
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .oss-status.error {
+            display: block;
+            background: #fce4ec;
+            color: #c62828;
+        }
+
+        /* ===== 上传进度 ===== */
+        .upload-progress-wrap {
+            display: none;
+            margin-top: 8px;
+        }
+        .upload-progress-wrap.active {
+            display: block;
+        }
+        .upload-progress-bar {
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .upload-progress-fill {
+            height: 100%;
+            background: var(--orange-gradient);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .upload-progress-text {
+            font-size: 12px;
+            color: var(--orange-primary);
+            margin-top: 4px;
+            font-weight: 600;
+        }
 
         /* ===== 登录弹窗 ===== */
         .login-overlay {
@@ -1372,7 +1544,13 @@
             <li><a href="#ai-features">AI课程</a></li>
             <li><a href="#videos">AI作品</a></li>
             <li><a href="#submit">提交作品</a></li>
-            <li><button class="navbar-admin-btn" id="adminBtn" onclick="toggleAdmin()">管理员登录</button></li>
+            <li>
+                <button class="navbar-data-btn" id="exportBtn" onclick="exportVideos()">📤 导出</button>
+                <button class="navbar-data-btn" id="importBtn" onclick="importVideos()">📥 导入</button>
+                <button class="navbar-oss-btn" id="ossConfigBtn" onclick="openOssConfig()">⚙️ OSS</button>
+                <button class="navbar-oss-btn" id="migrateOssBtn" onclick="migrateToOss()" style="font-size:12px;">🔄 迁移到OSS</button>
+                <button class="navbar-admin-btn" id="adminBtn" onclick="toggleAdmin()">管理员登录</button>
+            </li>
         </ul>
     </nav>
 
@@ -1662,6 +1840,40 @@
         </div>
     </div>
 
+    <!-- OSS配置弹窗 -->
+    <div class="oss-overlay" id="ossConfigOverlay">
+        <div class="oss-modal">
+            <h3>阿里云OSS配置</h3>
+            <p style="color:#888;font-size:0.9rem;margin-bottom:16px;">配置后，上传的视频将存储到OSS，所有访客均可查看。</p>
+            <div class="form-group">
+                <label>Endpoint</label>
+                <input type="text" id="ossEndpoint" placeholder="https://oss-cn-hangzhou.aliyuncs.com">
+            </div>
+            <div class="form-group">
+                <label>Bucket名称</label>
+                <input type="text" id="ossBucket" placeholder="beitelu-videos">
+            </div>
+            <div class="form-group">
+                <label>AccessKey ID</label>
+                <input type="text" id="ossAccessKeyId" placeholder="LTAI5t...">
+            </div>
+            <div class="form-group">
+                <label>AccessKey Secret</label>
+                <input type="password" id="ossAccessKeySecret" placeholder="输入AccessKey Secret">
+            </div>
+            <div class="form-group">
+                <label>自定义域名（可选）</label>
+                <input type="text" id="ossCustomDomain" placeholder="cdn.beitelu.com">
+            </div>
+            <div class="oss-status" id="ossStatus"></div>
+            <div class="oss-modal-btns">
+                <button class="oss-save-btn" onclick="saveOssConfig()">保存</button>
+                <button class="oss-test-btn" onclick="testOssConnection()">测试连接</button>
+                <button class="oss-cancel-btn" onclick="closeOssConfig()">取消</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 自定义右键菜单 -->
     <div class="video-context-menu" id="videoContextMenu">
         <div class="context-menu-item" onclick="downloadWithWatermark()">
@@ -1680,6 +1892,7 @@
         <p>贝特鹭综合素质教育中心 BEITELU &copy; 2026 | AI 赋能教育 · 用心陪伴成长</p>
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/ali-oss@6/dist/ali-oss.min.js"></script>
     <script>
         // ===== 神经网络粒子动画 =====
         (function() {
@@ -1757,6 +1970,14 @@
             '其它类': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
         };
 
+        // 预置示例作品
+        const sampleVideos = [
+            { id: 1, title: '早发白帝城', student: '王斓诺', grade: '三年级', school: '慈溪市文锦书院', category: '学科类', icon: '📚', aiTool: '未填写' },
+            { id: 2, title: '铃铛保卫战', student: '慈溪市中心小学西部校区', grade: '三年', school: '慈溪市中心小学西部校区', category: '漫剧类', icon: '', aiTool: '未填写' },
+            { id: 3, title: '撸铁', student: '徐一洲', grade: '四年级', school: '慈溪市慈吉实验小学', category: '其它类', icon: '✨', aiTool: '未填写' },
+            { id: 4, title: '肉饼子', student: '罗马珺玥', grade: '三年级', school: '慈溪市明月书院', category: '其它类', icon: '✨', aiTool: '未填写' }
+        ];
+
         let videos = [];
         let db = null;
 
@@ -1795,12 +2016,56 @@
                 const request = store.getAll();
                 request.onsuccess = function() {
                     videos = request.result || [];
+                    // 如果数据库为空，加载预置示例
+                    if (videos.length === 0) {
+                        videos = [...sampleVideos];
+                        saveVideos();
+                    }
                     resolve();
                 };
                 request.onerror = function() {
                     resolve();
                 };
             });
+        }
+
+        // 导出作品数据
+        function exportVideos() {
+            const dataStr = JSON.stringify(videos, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'beitelu_works_' + new Date().toISOString().slice(0,10) + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast(' 作品数据已导出');
+        }
+
+        // 导入作品数据
+        function importVideos() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    try {
+                        const imported = JSON.parse(ev.target.result);
+                        if (!Array.isArray(imported)) throw new Error('格式错误');
+                        videos = imported;
+                        saveVideos();
+                        renderVideos();
+                        showToast('📥 作品数据已导入，共 ' + imported.length + ' 个作品');
+                    } catch(err) {
+                        alert('导入失败：文件格式不正确');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
         }
 
         openDB().then(() => loadVideos()).then(() => {
@@ -2869,6 +3134,147 @@
             if (input.files.length > 0) nameEl.textContent = input.files[0].name;
         }
 
+        // ===== OSS 配置与上传 =====
+        function getOssConfig() {
+            try {
+                const raw = localStorage.getItem('beitelu_oss_config');
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
+        }
+
+        function openOssConfig() {
+            const cfg = getOssConfig();
+            if (cfg) {
+                document.getElementById('ossEndpoint').value = cfg.endpoint || '';
+                document.getElementById('ossBucket').value = cfg.bucket || '';
+                document.getElementById('ossAccessKeyId').value = cfg.accessKeyId || '';
+                document.getElementById('ossAccessKeySecret').value = cfg.accessKeySecret || '';
+                document.getElementById('ossCustomDomain').value = cfg.customDomain || '';
+            }
+            document.getElementById('ossStatus').textContent = '';
+            document.getElementById('ossConfigOverlay').classList.add('active');
+        }
+
+        function closeOssConfig() {
+            document.getElementById('ossConfigOverlay').classList.remove('active');
+        }
+
+        function saveOssConfig() {
+            const cfg = {
+                endpoint: document.getElementById('ossEndpoint').value.trim(),
+                bucket: document.getElementById('ossBucket').value.trim(),
+                accessKeyId: document.getElementById('ossAccessKeyId').value.trim(),
+                accessKeySecret: document.getElementById('ossAccessKeySecret').value.trim(),
+                customDomain: document.getElementById('ossCustomDomain').value.trim()
+            };
+            if (!cfg.endpoint || !cfg.bucket || !cfg.accessKeyId || !cfg.accessKeySecret) {
+                document.getElementById('ossStatus').textContent = '请填写完整的OSS配置信息';
+                document.getElementById('ossStatus').className = 'oss-status error';
+                return;
+            }
+            localStorage.setItem('beitelu_oss_config', JSON.stringify(cfg));
+            document.getElementById('ossStatus').textContent = '配置已保存';
+            document.getElementById('ossStatus').className = 'oss-status success';
+            setTimeout(closeOssConfig, 1000);
+        }
+
+        function testOssConnection() {
+            const cfg = {
+                endpoint: document.getElementById('ossEndpoint').value.trim(),
+                bucket: document.getElementById('ossBucket').value.trim(),
+                accessKeyId: document.getElementById('ossAccessKeyId').value.trim(),
+                accessKeySecret: document.getElementById('ossAccessKeySecret').value.trim()
+            };
+            if (!cfg.endpoint || !cfg.bucket || !cfg.accessKeyId || !cfg.accessKeySecret) {
+                document.getElementById('ossStatus').textContent = '请先填写完整配置';
+                document.getElementById('ossStatus').className = 'oss-status error';
+                return;
+            }
+            const statusEl = document.getElementById('ossStatus');
+            statusEl.textContent = '测试中...';
+            statusEl.className = 'oss-status';
+            try {
+                const client = new OSS(cfg);
+                client.list({ 'max-keys': 1 }).then(function() {
+                    statusEl.textContent = '连接成功！';
+                    statusEl.className = 'oss-status success';
+                }).catch(function(err) {
+                    statusEl.textContent = '连接失败: ' + err.message;
+                    statusEl.className = 'oss-status error';
+                });
+            } catch (err) {
+                statusEl.textContent = '初始化失败: ' + err.message;
+                statusEl.className = 'oss-status error';
+            }
+        }
+
+        function uploadToOSS(file, onProgress) {
+            const cfg = getOssConfig();
+            if (!cfg) return Promise.reject(new Error('OSS未配置'));
+            const timestamp = Date.now();
+            const safeName = file.name.replace(/[^a-zA-Z0-9._\-\u4e00-\u9fa5]/g, '_');
+            const key = 'videos/' + timestamp + '_' + safeName;
+            const client = new OSS(cfg);
+            return client.put(key, file, {
+                progress: function(p) {
+                    if (onProgress) onProgress(Math.round(p * 100));
+                }
+            }).then(function() {
+                if (cfg.customDomain) {
+                    return 'https://' + cfg.customDomain + '/' + key;
+                }
+                const ep = cfg.endpoint.replace(/\/+$/, '');
+                return ep.replace('https://', 'https://' + cfg.bucket + '.') + '/' + key;
+            });
+        }
+
+        function migrateToOss() {
+            const cfg = getOssConfig();
+            if (!cfg) {
+                alert('请先配置OSS信息');
+                openOssConfig();
+                return;
+            }
+            const blobVideos = videos.filter(v => v.videoFile && !v.videoUrl);
+            if (blobVideos.length === 0) {
+                alert('没有需要迁移的视频（所有视频已有OSS链接）');
+                return;
+            }
+            if (!confirm('找到 ' + blobVideos.length + ' 个本地视频需要迁移到OSS，确定开始？')) return;
+            const migrateBtn = document.getElementById('migrateOssBtn');
+            let done = 0;
+            const total = blobVideos.length;
+            migrateBtn.textContent = '迁移中 0/' + total;
+            migrateBtn.disabled = true;
+
+            const migrateNext = function(index) {
+                if (index >= blobVideos.length) {
+                    saveVideos();
+                    renderVideos();
+                    migrateBtn.textContent = '🔄 迁移到OSS';
+                    migrateBtn.disabled = false;
+                    alert('迁移完成！共迁移 ' + done + ' 个视频到OSS。');
+                    return;
+                }
+                const v = blobVideos[index];
+                const file = v.videoFile;
+                uploadToOSS(file).then(function(url) {
+                    const vid = videos.findIndex(x => x.id === v.id);
+                    if (vid >= 0) {
+                        videos[vid].videoUrl = url;
+                        delete videos[vid].videoFile;
+                    }
+                    done++;
+                    migrateBtn.textContent = '迁移中 ' + done + '/' + total;
+                    migrateNext(index + 1);
+                }).catch(function(err) {
+                    console.error('迁移失败:', v.title, err);
+                    migrateNext(index + 1);
+                });
+            };
+            migrateNext(0);
+        }
+
         function handleSubmit(e) {
             e.preventDefault();
             clearErrors();
@@ -2902,8 +3308,24 @@
             const icons = { '学科类': '📚', '漫剧类': '🎭', '游戏类': '🎮', '3D类': '', '其它类': '✨' };
             const cat = document.getElementById('workCategory').value;
             const file = fileInput.files[0];
+            const ossCfg = getOssConfig();
 
-            videos.push({
+            const submitBtn = document.querySelector('#submitModal .submit-form-btn');
+            const originalBtnText = submitBtn ? submitBtn.textContent : '提交作品';
+
+            const doSubmit = function(videoData) {
+                videos.push(videoData);
+                document.getElementById('submitForm').reset();
+                document.getElementById('fileName').textContent = '';
+                saveVideos();
+                closeSubmitModal();
+                renderVideos();
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 3000);
+            };
+
+            const baseData = {
                 id: Date.now(),
                 title: document.getElementById('workName').value,
                 student: document.getElementById('studentName').value,
@@ -2912,25 +3334,43 @@
                 category: cat,
                 icon: icons[cat] || '',
                 aiTool: document.getElementById('aiTool').value || '未填写',
-                videoFile: file,
                 isUpload: true,
-            });
+            };
 
-            document.getElementById('submitForm').reset();
-            document.getElementById('fileName').textContent = '';
-            saveVideos();
-            closeSubmitModal();
-            renderVideos();
-
-            const toast = document.getElementById('toast');
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
+            if (ossCfg) {
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = '上传中... 0%';
+                    submitBtn.style.opacity = '0.7';
+                }
+                uploadToOSS(file, function(pct) {
+                    if (submitBtn) submitBtn.textContent = '上传中... ' + pct + '%';
+                }).then(function(ossUrl) {
+                    baseData.videoUrl = ossUrl;
+                    doSubmit(baseData);
+                }).catch(function(err) {
+                    alert('上传到OSS失败: ' + err.message + '\n请检查OSS配置和网络连接。');
+                }).finally(function() {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalBtnText;
+                        submitBtn.style.opacity = '1';
+                    }
+                });
+            } else {
+                baseData.videoFile = file;
+                doSubmit(baseData);
+            }
 
             return false;
         }
 
         document.getElementById('submitModal').addEventListener('click', function(e) {
             if (e.target === this) closeSubmitModal();
+        });
+
+        document.getElementById('ossConfigOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeOssConfig();
         });
 
         // 滚动动画
@@ -2998,12 +3438,24 @@
 
         function updateAdminBtn() {
             const btn = document.getElementById('adminBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            const importBtn = document.getElementById('importBtn');
+            const ossBtn = document.getElementById('ossConfigBtn');
+            const migrateBtn = document.getElementById('migrateOssBtn');
             if (isAdmin) {
                 btn.textContent = '退出管理';
                 btn.classList.add('is-admin');
+                exportBtn.classList.add('visible');
+                importBtn.classList.add('visible');
+                ossBtn.classList.add('visible');
+                migrateBtn.classList.add('visible');
             } else {
                 btn.textContent = '管理员登录';
                 btn.classList.remove('is-admin');
+                exportBtn.classList.remove('visible');
+                importBtn.classList.remove('visible');
+                ossBtn.classList.remove('visible');
+                migrateBtn.classList.remove('visible');
             }
         }
 
