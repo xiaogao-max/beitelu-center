@@ -1892,7 +1892,7 @@
         <p>贝特鹭综合素质教育中心 BEITELU &copy; 2026 | AI 赋能教育 · 用心陪伴成长</p>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/ali-oss@6/dist/ali-oss.min.js"></script>
+    <script src="https://gosspublic.alicdn.com/aliyun-oss-sdk-6.23.0.min.js"></script>
     <script>
         // ===== 神经网络粒子动画 =====
         (function() {
@@ -3135,6 +3135,13 @@
         }
 
         // ===== OSS 配置与上传 =====
+        function normalizeEndpoint(endpoint) {
+            let ep = (endpoint || '').trim().replace(/\/+$/, '');
+            if (!ep) return '';
+            if (!/^https?:\/\//i.test(ep)) ep = 'https://' + ep;
+            return ep;
+        }
+
         function getOssConfig() {
             try {
                 const raw = localStorage.getItem('beitelu_oss_config');
@@ -3161,7 +3168,7 @@
 
         function saveOssConfig() {
             const cfg = {
-                endpoint: document.getElementById('ossEndpoint').value.trim(),
+                endpoint: normalizeEndpoint(document.getElementById('ossEndpoint').value),
                 bucket: document.getElementById('ossBucket').value.trim(),
                 accessKeyId: document.getElementById('ossAccessKeyId').value.trim(),
                 accessKeySecret: document.getElementById('ossAccessKeySecret').value.trim(),
@@ -3180,7 +3187,7 @@
 
         function testOssConnection() {
             const cfg = {
-                endpoint: document.getElementById('ossEndpoint').value.trim(),
+                endpoint: normalizeEndpoint(document.getElementById('ossEndpoint').value),
                 bucket: document.getElementById('ossBucket').value.trim(),
                 accessKeyId: document.getElementById('ossAccessKeyId').value.trim(),
                 accessKeySecret: document.getElementById('ossAccessKeySecret').value.trim()
