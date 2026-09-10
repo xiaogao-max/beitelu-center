@@ -2076,6 +2076,18 @@
 
         const categoryNames = new Proxy({}, { get: (_, k) => k });
 
+        // 分类以中文标签存储（表单/筛选/图标均用中文），canvas 动画与音效按英文键索引，此处做映射
+        const CATEGORY_SLUGS = {
+            '学科类': 'subject',
+            '漫剧类': 'comic',
+            '游戏类': 'game',
+            '3D类': '3d',
+            '其它类': 'other'
+        };
+        function categorySlug(category) {
+            return CATEGORY_SLUGS[category] || category || 'other';
+        }
+
         // 渲染视频列表
         function renderVideos() {
             const grid = document.getElementById('videoGrid');
@@ -2169,6 +2181,7 @@
 
         function playCategorySound(category) {
             if (!audioCtx) return;
+            category = categorySlug(category);
             const now = audioCtx.currentTime;
             if (category === 'subject') {
                 const notes = [523, 587, 659, 698, 784, 880, 784, 698, 659, 587];
@@ -2261,7 +2274,8 @@
             ctx.globalAlpha = 1;
 
             if (currentVideoData) {
-                animDrawers[currentVideoData.category](ctx, w, h, t, currentVideoData);
+                const drawer = animDrawers[categorySlug(currentVideoData.category)] || animDrawers.other;
+                drawer(ctx, w, h, t, currentVideoData);
             }
 
             if (progress >= 1) {
