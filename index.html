@@ -2260,8 +2260,7 @@
                     resolve(result);
                 }
 
-                vid.addEventListener('seeked', function onSeeked() {
-                    vid.removeEventListener('seeked', onSeeked);
+                function captureFrame() {
                     try {
                         const c = document.createElement('canvas');
                         c.width = vid.videoWidth || 320;
@@ -2273,6 +2272,11 @@
                         console.warn('缩略图提取失败:', e);
                         done(null);
                     }
+                }
+
+                vid.addEventListener('loadeddata', function onLoadedData() {
+                    vid.removeEventListener('loadeddata', onLoadedData);
+                    captureFrame();
                 });
 
                 vid.addEventListener('error', function() { done(null); });
@@ -2281,7 +2285,6 @@
 
                 vid.src = src;
                 vid.load();
-                vid.currentTime = 0;
             });
         }
 
