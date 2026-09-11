@@ -1000,6 +1000,15 @@
             filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
         }
 
+        .video-thumb .thumb-img {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
         .video-thumb .play-btn {
             position: absolute;
             width: 56px; height: 56px;
@@ -2042,6 +2051,7 @@
                     const copy = Object.assign({}, v);
                     delete copy.videoFile;
                     delete copy.fromManifest;
+                    delete copy.thumbnail;
                     return copy;
                 });
             // 浏览器端 ali-oss 只接受 Blob/File，字符串会被拒绝
@@ -2193,11 +2203,15 @@
                 return;
             }
 
-            grid.innerHTML = filtered.map(v => `
+            grid.innerHTML = filtered.map(v => {
+                const thumbContent = v.thumbnail
+                    ? `<img class="thumb-img" src="${v.thumbnail}" alt="${v.title}">`
+                    : `<div class="thumb-bg" style="background: ${thumbGradients[v.category] || thumbGradients['其它类']}"></div>
+                       <span class="thumb-icon">${v.icon}</span>`;
+                return `
                 <div class="video-card" onclick="playVideo(${v.id})">
                     <div class="video-thumb">
-                        <div class="thumb-bg" style="background: ${thumbGradients[v.category] || thumbGradients['其它类']}"></div>
-                        <span class="thumb-icon">${v.icon}</span>
+                        ${thumbContent}
                         <div class="play-btn">▶</div>
                         <span class="ai-badge-thumb">🤖 AI</span>
                     </div>
@@ -2214,8 +2228,104 @@
                             <button class="btn-delete" onclick="adminDelete(${v.id}, event)">🗑️ 删除</button>
                         </div>` : ''}
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
+
+            extractMissingThumbnails();
+        }
+
+        function extractThumbnail(v) {
+            return new Promise(function(resolve) {
+                let src = '';
+                let blobUrl = null;
+                if (v.videoUrl) {
+                    src = v.videoUrl;
+                } else if (v.videoFile) {
+                    blobUrl = URL.createObjectURL(v.videoFile);
+                    src = blobUrl;
+                }
+                if (!src) { resolve(null); return; }
+
+                const vid = document.createElement('video');
+                vid.preload = 'auto';
+                vid.muted = true;
+                vid.playsInline = true;
+                if (v.videoUrl) vid.crossOrigin = 'anonymous';
+
+                let resolved = false;
+                function done(result) {
+                    if (resolved) return;
+                    resolved = true;
+                    if (blobUrl) URL.revokeObjectURL(blobUrl);
+                    resolve(result);
+                }
+
+                vid.addEventListener('seeked', function onSeeked() {
+                    vid.removeEventListener('seeked', onSeeked);
+                    try {
+                        const c = document.createElement('canvas');
+                        c.width = vid.videoWidth || 320;
+                        c.height = vid.videoHeight || 180;
+                        const ctx = c.getContext('2d');
+                        ctx.drawImage(vid, 0, 0, c.width, c.height);
+                        done(c.toDataURL('image/jpeg', 0.7));
+                    } catch(e) {
+                        console.warn('缩略图提取失败:', e);
+                        done(null);
+                    }
+                });
+
+                vid.addEventListener('error', function() { done(null); });
+
+                setTimeout(function() { done(null); }, 15000);
+
+                vid.src = src;
+                vid.load();
+                vid.currentTime = 0;
+            });
+        }
+
+        var _extractingThumbnails = false;
+        function extractMissingThumbnails() {
+            if (_extractingThumbnails) return;
+            const needThumb = videos.filter(function(v) {
+                return !v.thumbnail && v.isUpload && (v.videoUrl || v.videoFile);
+            });
+            if (needThumb.length === 0) return;
+
+            _extractingThumbnails = true;
+            let idx = 0;
+            function next() {
+                if (idx >= needThumb.length) {
+                    _extractingThumbnails = false;
+                    return;
+                }
+                const v = needThumb[idx];
+                idx++;
+                extractThumbnail(v).then(function(dataUrl) {
+                    if (dataUrl) {
+                        v.thumbnail = dataUrl;
+                        if (db) {
+                            const tx = db.transaction('videos', 'readwrite');
+                            tx.objectStore('videos').put(v);
+                        }
+                        var card = document.querySelector('.video-card[onclick="playVideo(' + v.id + ')"' + '] .video-thumb');
+                        if (card && !card.querySelector('.thumb-img')) {
+                            var bg = card.querySelector('.thumb-bg');
+                            var icon = card.querySelector('.thumb-icon');
+                            if (bg) bg.remove();
+                            if (icon) icon.remove();
+                            var img = document.createElement('img');
+                            img.className = 'thumb-img';
+                            img.src = dataUrl;
+                            img.alt = v.title;
+                            card.insertBefore(img, card.firstChild);
+                        }
+                    }
+                    next();
+                });
+            }
+            next();
         }
 
         // 分类切换
