@@ -2044,7 +2044,9 @@
                     delete copy.fromManifest;
                     return copy;
                 });
-            new OSS(cfg).put(MANIFEST_KEY, JSON.stringify(list), {
+            // 浏览器端 ali-oss 只接受 Blob/File，字符串会被拒绝
+            const body = new Blob([JSON.stringify(list)], { type: 'application/json;charset=utf-8' });
+            new OSS(cfg).put(MANIFEST_KEY, body, {
                 mime: 'application/json;charset=utf-8',
                 headers: { 'Cache-Control': 'no-cache' }
             }).then(function() {
