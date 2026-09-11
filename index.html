@@ -1981,6 +1981,88 @@
         let videos = [];
         let db = null;
 
+        // 作品清单放在 OSS 公共桶里，所有访客都能读到；本地 IndexedDB 只作缓存和未上传文件的暂存
+        const MANIFEST_KEY = 'videos.json';
+        const PUBLIC_MANIFEST_URL = 'https://beitelu-videos.oss-cn-hangzhou.aliyuncs.com/' + MANIFEST_KEY;
+
+        let deletedIds = [];
+        try {
+            const savedDeleted = JSON.parse(localStorage.getItem('beitelu_deleted_ids') || '[]');
+            if (Array.isArray(savedDeleted)) deletedIds = savedDeleted;
+        } catch (e) { /* 本地记录损坏时忽略 */ }
+
+        function markDeleted(id) {
+            if (!deletedIds.includes(id)) {
+                deletedIds.push(id);
+                localStorage.setItem('beitelu_deleted_ids', JSON.stringify(deletedIds));
+            }
+        }
+
+        function manifestUrl() {
+            const cfg = getOssConfig();
+            if (!cfg || !cfg.endpoint || !cfg.bucket) return PUBLIC_MANIFEST_URL;
+            if (cfg.customDomain) return 'https://' + cfg.customDomain.replace(/\/+$/, '') + '/' + MANIFEST_KEY;
+            return cfg.endpoint.replace(/\/+$/, '').replace('https://', 'https://' + cfg.bucket + '.') + '/' + MANIFEST_KEY;
+        }
+
+        function fetchManifest() {
+            return fetch(manifestUrl() + '?t=' + Date.now(), { cache: 'no-store' })
+                .then(res => res.ok ? res.json() : null)
+                .then(data => (Array.isArray(data) ? data : null))
+                .catch(() => null);
+        }
+
+        function mergeWithManifest(remote, local) {
+            const localById = {};
+            local.forEach(v => { localById[v.id] = v; });
+            const remoteIds = {};
+            const merged = remote.map(r => {
+                remoteIds[r.id] = true;
+                const l = localById[r.id];
+                // 本地有还没同步上去的修改时，以本地为准
+                if (l && l.fromManifest === false) return l;
+                const copy = Object.assign({}, r);
+                copy.fromManifest = true;
+                return copy;
+            });
+            local.forEach(l => {
+                if (remoteIds[l.id]) return;
+                if (l.fromManifest === true) return; // 云端已删除，本地缓存不再保留
+                if (l.videoFile || l.videoUrl) merged.push(l);
+            });
+            return merged;
+        }
+
+        function publishManifest() {
+            const cfg = getOssConfig();
+            if (!cfg || typeof OSS === 'undefined') return;
+            const list = videos
+                .filter(v => !v.videoFile || v.videoUrl)
+                .map(v => {
+                    const copy = Object.assign({}, v);
+                    delete copy.videoFile;
+                    delete copy.fromManifest;
+                    return copy;
+                });
+            new OSS(cfg).put(MANIFEST_KEY, JSON.stringify(list), {
+                mime: 'application/json;charset=utf-8',
+                headers: { 'Cache-Control': 'no-cache' }
+            }).then(function() {
+                console.log('作品清单已同步，共 ' + list.length + ' 个作品');
+            }).catch(function(err) {
+                console.error('作品清单同步失败:', err);
+                showToast('⚠️ 作品清单同步失败，其他电脑可能看不到最新作品');
+            });
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
         function openDB() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open('beitelu_db', 1);
@@ -2006,6 +2088,7 @@
             const store = tx.objectStore('videos');
             store.clear();
             videos.forEach(v => store.put(v));
+            publishManifest();
         }
 
         function loadVideos() {
@@ -2015,13 +2098,15 @@
                 const store = tx.objectStore('videos');
                 const request = store.getAll();
                 request.onsuccess = function() {
-                    videos = request.result || [];
-                    // 如果数据库为空，加载预置示例
-                    if (videos.length === 0) {
-                        videos = [...sampleVideos];
+                    const local = request.result || [];
+                    fetchManifest().then(function(remote) {
+                        videos = remote ? mergeWithManifest(remote, local) : local;
+                        // 云端清单还没有时，用本地数据或预置示例兜底
+                        if (videos.length === 0) videos = [...sampleVideos];
+                        videos = videos.filter(v => !deletedIds.includes(v.id));
                         saveVideos();
-                    }
-                    resolve();
+                        resolve();
+                    });
                 };
                 request.onerror = function() {
                     resolve();
@@ -2056,6 +2141,8 @@
                         const imported = JSON.parse(ev.target.result);
                         if (!Array.isArray(imported)) throw new Error('格式错误');
                         videos = imported;
+                        deletedIds = [];
+                        localStorage.removeItem('beitelu_deleted_ids');
                         saveVideos();
                         renderVideos();
                         showToast('📥 作品数据已导入，共 ' + imported.length + ' 个作品');
@@ -3284,6 +3371,7 @@
                     if (vid >= 0) {
                         videos[vid].videoUrl = url;
                         delete videos[vid].videoFile;
+                        videos[vid].fromManifest = false;
                     }
                     done++;
                     migrateBtn.textContent = '迁移中 ' + done + '/' + total;
@@ -3356,6 +3444,7 @@
                 icon: icons[cat] || '',
                 aiTool: document.getElementById('aiTool').value || '未填写',
                 isUpload: true,
+                fromManifest: false,
             };
 
             if (ossCfg) {
@@ -3484,10 +3573,8 @@
             e.stopPropagation();
             if (!confirm('确定要永久删除这个作品吗？删除后不可恢复。')) return;
             videos = videos.filter(v => v.id !== id);
-            if (db) {
-                const tx = db.transaction('videos', 'readwrite');
-                tx.objectStore('videos').delete(id);
-            }
+            markDeleted(id);
+            saveVideos();
             renderVideos();
         }
 
@@ -3520,6 +3607,7 @@
             v.grade = document.getElementById('editGrade').value.trim() || v.grade;
             v.category = document.getElementById('editCategory').value || v.category;
             v.aiTool = document.getElementById('editAiTool').value.trim() || v.aiTool;
+            v.fromManifest = false;
             saveVideos();
             closeEdit();
             renderVideos();
