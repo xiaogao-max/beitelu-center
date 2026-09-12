@@ -2238,56 +2238,88 @@
 
         function extractThumbnail(v) {
             return new Promise(function(resolve) {
-                let src = '';
-                let blobUrl = null;
-                if (v.videoUrl) {
-                    src = v.videoUrl;
-                } else if (v.videoFile) {
-                    blobUrl = URL.createObjectURL(v.videoFile);
-                    src = blobUrl;
+                if (v.videoFile) {
+                    var blobUrl = URL.createObjectURL(v.videoFile);
+                    doExtractThumbnail(blobUrl, blobUrl, resolve);
+                } else if (v.videoUrl) {
+                    fetch(v.videoUrl).then(function(resp) {
+                        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                        return resp.blob();
+                    }).then(function(blob) {
+                        var blobUrl = URL.createObjectURL(blob);
+                        doExtractThumbnail(blobUrl, blobUrl, resolve);
+                    }).catch(function() {
+                        doExtractThumbnail(v.videoUrl, null, resolve);
+                    });
+                } else {
+                    resolve(null);
                 }
-                if (!src) { resolve(null); return; }
+            });
+        }
 
-                const vid = document.createElement('video');
-                vid.preload = 'auto';
-                vid.muted = true;
-                vid.playsInline = true;
-                if (v.videoUrl) vid.crossOrigin = 'anonymous';
+        function doExtractThumbnail(src, blobUrl, resolve) {
+            var vid = document.createElement('video');
+            vid.preload = 'auto';
+            vid.muted = true;
+            vid.playsInline = true;
 
-                let resolved = false;
-                function done(result) {
-                    if (resolved) return;
-                    resolved = true;
-                    if (blobUrl) URL.revokeObjectURL(blobUrl);
-                    resolve(result);
-                }
+            var resolved = false;
+            function done(result) {
+                if (resolved) return;
+                resolved = true;
+                if (blobUrl) URL.revokeObjectURL(blobUrl);
+                resolve(result);
+            }
 
-                function captureFrame() {
-                    try {
-                        const c = document.createElement('canvas');
-                        c.width = vid.videoWidth || 320;
-                        c.height = vid.videoHeight || 180;
-                        const ctx = c.getContext('2d');
-                        ctx.drawImage(vid, 0, 0, c.width, c.height);
-                        done(c.toDataURL('image/jpeg', 0.7));
-                    } catch(e) {
-                        console.warn('缩略图提取失败:', e);
+            function captureFrame() {
+                try {
+                    if (!vid.videoWidth || !vid.videoHeight) { done(null); return; }
+                    var c = document.createElement('canvas');
+                    c.width = vid.videoWidth;
+                    c.height = vid.videoHeight;
+                    var ctx = c.getContext('2d');
+                    ctx.drawImage(vid, 0, 0, c.width, c.height);
+                    var dataUrl = c.toDataURL('image/jpeg', 0.7);
+                    if (dataUrl && dataUrl.length > 100) {
+                        done(dataUrl);
+                    } else {
                         done(null);
                     }
+                } catch(e) {
+                    console.warn('缩略图提取失败:', e);
+                    done(null);
                 }
+            }
 
-                vid.addEventListener('loadeddata', function onLoadedData() {
-                    vid.removeEventListener('loadeddata', onLoadedData);
+            function trySeek() {
+                if (vid.duration > 0.1 && vid.currentTime < 0.1) {
+                    vid.currentTime = 0.1;
+                    vid.addEventListener('seeked', function onSeeked() {
+                        vid.removeEventListener('seeked', onSeeked);
+                        captureFrame();
+                    });
+                } else {
                     captureFrame();
-                });
+                }
+            }
 
-                vid.addEventListener('error', function() { done(null); });
-
-                setTimeout(function() { done(null); }, 15000);
-
-                vid.src = src;
-                vid.load();
+            vid.addEventListener('loadeddata', function onLoadedData() {
+                vid.removeEventListener('loadeddata', onLoadedData);
+                vid.removeEventListener('canplay', onCanPlay);
+                trySeek();
             });
+
+            vid.addEventListener('canplay', function onCanPlay() {
+                vid.removeEventListener('loadeddata', onLoadedData);
+                vid.removeEventListener('canplay', onCanPlay);
+                trySeek();
+            });
+
+            vid.addEventListener('error', function() { done(null); });
+            setTimeout(function() { done(null); }, 15000);
+
+            vid.src = src;
+            vid.load();
         }
 
         var _extractingThumbnails = false;
