@@ -2242,13 +2242,16 @@
                     var blobUrl = URL.createObjectURL(v.videoFile);
                     doExtractThumbnail(blobUrl, blobUrl, resolve);
                 } else if (v.videoUrl) {
-                    fetch(v.videoUrl).then(function(resp) {
+                    // Try fetch first (works if OSS has CORS headers)
+                    fetch(v.videoUrl, { mode: 'cors' }).then(function(resp) {
                         if (!resp.ok) throw new Error('HTTP ' + resp.status);
                         return resp.blob();
                     }).then(function(blob) {
                         var blobUrl = URL.createObjectURL(blob);
                         doExtractThumbnail(blobUrl, blobUrl, resolve);
-                    }).catch(function() {
+                    }).catch(function(err) {
+                        console.log('[thumb] fetch failed, trying direct load:', err.message);
+                        // Fallback: try loading video directly without crossOrigin
                         doExtractThumbnail(v.videoUrl, null, resolve);
                     });
                 } else {
@@ -2262,8 +2265,13 @@
             vid.preload = 'auto';
             vid.muted = true;
             vid.playsInline = true;
+            // Only set crossOrigin for same-origin/blob URLs
+            if (src.startsWith('blob:')) {
+                vid.crossOrigin = 'anonymous';
+            }
 
             var resolved = false;
+            var triggered = false;
             function done(result) {
                 if (resolved) return;
                 resolved = true;
@@ -2273,7 +2281,10 @@
 
             function captureFrame() {
                 try {
-                    if (!vid.videoWidth || !vid.videoHeight) { done(null); return; }
+                    if (!vid.videoWidth || !vid.videoHeight) {
+                        console.log('[thumb] no dimensions yet, retrying...');
+                        return false;
+                    }
                     var c = document.createElement('canvas');
                     c.width = vid.videoWidth;
                     c.height = vid.videoHeight;
@@ -2281,42 +2292,71 @@
                     ctx.drawImage(vid, 0, 0, c.width, c.height);
                     var dataUrl = c.toDataURL('image/jpeg', 0.7);
                     if (dataUrl && dataUrl.length > 100) {
+                        console.log('[thumb] success, size:', dataUrl.length);
                         done(dataUrl);
+                        return true;
                     } else {
+                        console.log('[thumb] dataUrl too short');
                         done(null);
+                        return true;
                     }
                 } catch(e) {
-                    console.warn('缩略图提取失败:', e);
+                    console.warn('[thumb] canvas error:', e.message);
+                    done(null);
+                    return true;
+                }
+            }
+
+            function tryCapture() {
+                if (triggered) return;
+                triggered = true;
+                // Give video a moment to render frame
+                setTimeout(function() {
+                    if (!captureFrame()) {
+                        // Dimensions not ready, poll a few times
+                        var attempts = 0;
+                        var pollTimer = setInterval(function() {
+                            attempts++;
+                            if (captureFrame() || attempts >= 10) {
+                                clearInterval(pollTimer);
+                                if (attempts >= 10 && !resolved) {
+                                    console.log('[thumb] polling exhausted');
+                                    done(null);
+                                }
+                            }
+                        }, 300);
+                    }
+                }, 200);
+            }
+
+            // Listen for multiple events - Edge may fire different ones
+            vid.addEventListener('loadedmetadata', function() {
+                console.log('[thumb] loadedmetadata fired, dims:', vid.videoWidth, 'x', vid.videoHeight);
+                tryCapture();
+            });
+
+            vid.addEventListener('loadeddata', function() {
+                console.log('[thumb] loadeddata fired');
+                tryCapture();
+            });
+
+            vid.addEventListener('canplay', function() {
+                console.log('[thumb] canplay fired');
+                tryCapture();
+            });
+
+            vid.addEventListener('error', function(e) {
+                console.log('[thumb] video error:', vid.error ? vid.error.code : 'unknown');
+                done(null);
+            });
+
+            // Safety timeout
+            setTimeout(function() {
+                if (!resolved) {
+                    console.log('[thumb] timeout after 15s');
                     done(null);
                 }
-            }
-
-            function trySeek() {
-                if (vid.duration > 0.1 && vid.currentTime < 0.1) {
-                    vid.currentTime = 0.1;
-                    vid.addEventListener('seeked', function onSeeked() {
-                        vid.removeEventListener('seeked', onSeeked);
-                        captureFrame();
-                    });
-                } else {
-                    captureFrame();
-                }
-            }
-
-            vid.addEventListener('loadeddata', function onLoadedData() {
-                vid.removeEventListener('loadeddata', onLoadedData);
-                vid.removeEventListener('canplay', onCanPlay);
-                trySeek();
-            });
-
-            vid.addEventListener('canplay', function onCanPlay() {
-                vid.removeEventListener('loadeddata', onLoadedData);
-                vid.removeEventListener('canplay', onCanPlay);
-                trySeek();
-            });
-
-            vid.addEventListener('error', function() { done(null); });
-            setTimeout(function() { done(null); }, 15000);
+            }, 15000);
 
             vid.src = src;
             vid.load();
