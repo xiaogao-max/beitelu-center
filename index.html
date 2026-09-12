@@ -2171,6 +2171,8 @@
 
         openDB().then(() => loadVideos()).then(() => {
             renderVideos();
+            // Sync locally-cached thumbnails to OSS so all browsers can display them
+            setTimeout(syncThumbnailsToOSS, 2000);
         });
 
         let currentCategory = 'all';
@@ -2206,8 +2208,9 @@
             }
 
             grid.innerHTML = filtered.map(v => {
-                const thumbContent = v.thumbnail
-                    ? `<img class="thumb-img" src="${v.thumbnail}" alt="${v.title}">`
+                const thumbSrc = v.thumbnailUrl || v.thumbnail;
+                const thumbContent = thumbSrc
+                    ? `<img class="thumb-img" src="${thumbSrc}" alt="${v.title}">`
                     : `<div class="thumb-bg" style="background: ${thumbGradients[v.category] || thumbGradients['其它类']}"></div>
                        <span class="thumb-icon">${v.icon}</span>`;
                 return `
@@ -2366,7 +2369,7 @@
         function extractMissingThumbnails() {
             if (_extractingThumbnails) return;
             const needThumb = videos.filter(function(v) {
-                return !v.thumbnail && v.isUpload && (v.videoUrl || v.videoFile);
+                return !v.thumbnailUrl && !v.thumbnail && v.isUpload && (v.videoUrl || v.videoFile);
             });
             if (needThumb.length === 0) return;
 
@@ -2382,27 +2385,79 @@
                 extractThumbnail(v).then(function(dataUrl) {
                     if (dataUrl) {
                         v.thumbnail = dataUrl;
-                        if (db) {
-                            const tx = db.transaction('videos', 'readwrite');
-                            tx.objectStore('videos').put(v);
-                        }
-                        var card = document.querySelector('.video-card[onclick="playVideo(' + v.id + ')"' + '] .video-thumb');
-                        if (card && !card.querySelector('.thumb-img')) {
-                            var bg = card.querySelector('.thumb-bg');
-                            var icon = card.querySelector('.thumb-icon');
-                            if (bg) bg.remove();
-                            if (icon) icon.remove();
-                            var img = document.createElement('img');
-                            img.className = 'thumb-img';
-                            img.src = dataUrl;
-                            img.alt = v.title;
-                            card.insertBefore(img, card.firstChild);
-                        }
+                        // Upload thumbnail to OSS so other browsers can load it without CORS
+                        uploadThumbnailToOSS(dataUrl, v.id).then(function(thumbUrl) {
+                            v.thumbnailUrl = thumbUrl;
+                            if (db) {
+                                const tx = db.transaction('videos', 'readwrite');
+                                tx.objectStore('videos').put(v);
+                            }
+                            publishManifest();
+                            updateCardThumb(v, thumbUrl);
+                        }).catch(function() {
+                            if (db) {
+                                const tx = db.transaction('videos', 'readwrite');
+                                tx.objectStore('videos').put(v);
+                            }
+                            updateCardThumb(v, dataUrl);
+                        });
                     }
                     next();
                 });
             }
             next();
+        }
+
+        function updateCardThumb(v, src) {
+            var card = document.querySelector('.video-card[onclick="playVideo(' + v.id + ')"' + '] .video-thumb');
+            if (card && !card.querySelector('.thumb-img')) {
+                var bg = card.querySelector('.thumb-bg');
+                var icon = card.querySelector('.thumb-icon');
+                if (bg) bg.remove();
+                if (icon) icon.remove();
+                var img = document.createElement('img');
+                img.className = 'thumb-img';
+                img.src = src;
+                img.alt = v.title;
+                card.insertBefore(img, card.firstChild);
+            }
+        }
+
+        // Upload locally-cached thumbnails (dataUrl) to OSS so all browsers can load them
+        var _syncingThumbs = false;
+        function syncThumbnailsToOSS() {
+            if (_syncingThumbs) return;
+            const cfg = getOssConfig();
+            if (!cfg || typeof OSS === 'undefined') return;
+            const needSync = videos.filter(function(v) {
+                return v.thumbnail && !v.thumbnailUrl;
+            });
+            if (needSync.length === 0) return;
+
+            _syncingThumbs = true;
+            let idx = 0;
+            let changed = false;
+            function nextSync() {
+                if (idx >= needSync.length) {
+                    _syncingThumbs = false;
+                    if (changed) {
+                        saveVideos();
+                        publishManifest();
+                        console.log('已同步 ' + needSync.length + ' 个缩略图到OSS');
+                    }
+                    return;
+                }
+                const v = needSync[idx];
+                idx++;
+                uploadThumbnailToOSS(v.thumbnail, v.id).then(function(thumbUrl) {
+                    v.thumbnailUrl = thumbUrl;
+                    changed = true;
+                    nextSync();
+                }).catch(function() {
+                    nextSync();
+                });
+            }
+            nextSync();
         }
 
         // 分类切换
@@ -3525,6 +3580,34 @@
             });
         }
 
+        function dataUrlToBlob(dataUrl) {
+            var parts = dataUrl.split(',');
+            var mime = parts[0].match(/:(.*?);/)[1];
+            var bstr = atob(parts[1]);
+            var n = bstr.length;
+            var u8arr = new Uint8Array(n);
+            while (n--) u8arr[n] = bstr.charCodeAt(n);
+            return new Blob([u8arr], { type: mime });
+        }
+
+        function uploadThumbnailToOSS(dataUrl, timestamp) {
+            const cfg = getOssConfig();
+            if (!cfg) return Promise.reject(new Error('OSS未配置'));
+            const blob = dataUrlToBlob(dataUrl);
+            const key = 'thumbs/' + timestamp + '.jpg';
+            const client = new OSS(cfg);
+            return client.put(key, blob, {
+                mime: 'image/jpeg',
+                headers: { 'Cache-Control': 'max-age=31536000' }
+            }).then(function() {
+                if (cfg.customDomain) {
+                    return 'https://' + cfg.customDomain + '/' + key;
+                }
+                const ep = cfg.endpoint.replace(/\/+$/, '');
+                return ep.replace('https://', 'https://' + cfg.bucket + '.') + '/' + key;
+            });
+        }
+
         function migrateToOss() {
             const cfg = getOssConfig();
             if (!cfg) {
@@ -3642,11 +3725,25 @@
                     submitBtn.textContent = '上传中... 0%';
                     submitBtn.style.opacity = '0.7';
                 }
+                var uploadTs = Date.now();
                 uploadToOSS(file, function(pct) {
                     if (submitBtn) submitBtn.textContent = '上传中... ' + pct + '%';
                 }).then(function(ossUrl) {
                     baseData.videoUrl = ossUrl;
+                    // Extract thumbnail from local file and upload to OSS
+                    return extractThumbnail({ videoFile: file }).then(function(dataUrl) {
+                        if (dataUrl) {
+                            baseData.thumbnail = dataUrl;
+                            return uploadThumbnailToOSS(dataUrl, uploadTs).then(function(thumbUrl) {
+                                baseData.thumbnailUrl = thumbUrl;
+                            }).catch(function(err) {
+                                console.warn('缩略图上传失败:', err.message);
+                            });
+                        }
+                    });
+                }).then(function() {
                     doSubmit(baseData);
+                    publishManifest();
                 }).catch(function(err) {
                     alert('上传到OSS失败: ' + err.message + '\n请检查OSS配置和网络连接。');
                 }).finally(function() {
