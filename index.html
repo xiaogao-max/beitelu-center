@@ -2043,27 +2043,29 @@
         }
 
         function publishManifest() {
-            const cfg = getOssConfig();
-            if (!cfg || typeof OSS === 'undefined') return;
-            const list = videos
+            var cfg = getOssConfig();
+            if (!cfg || typeof OSS === 'undefined') return Promise.resolve(false);
+            var list = videos
                 .filter(v => !v.videoFile || v.videoUrl)
                 .map(v => {
-                    const copy = Object.assign({}, v);
+                    var copy = Object.assign({}, v);
                     delete copy.videoFile;
                     delete copy.fromManifest;
                     delete copy.thumbnail;
                     return copy;
                 });
             // 浏览器端 ali-oss 只接受 Blob/File，字符串会被拒绝
-            const body = new Blob([JSON.stringify(list)], { type: 'application/json;charset=utf-8' });
-            new OSS(cfg).put(MANIFEST_KEY, body, {
+            var body = new Blob([JSON.stringify(list)], { type: 'application/json;charset=utf-8' });
+            return new OSS(cfg).put(MANIFEST_KEY, body, {
                 mime: 'application/json;charset=utf-8',
                 headers: { 'Cache-Control': 'no-cache' }
             }).then(function() {
                 console.log('作品清单已同步，共 ' + list.length + ' 个作品');
+                return true;
             }).catch(function(err) {
                 console.error('作品清单同步失败:', err);
                 showToast('⚠️ 作品清单同步失败，其他电脑可能看不到最新作品');
+                return false;
             });
         }
 
@@ -3687,6 +3689,10 @@
         function adminDelete(id, e) {
             e.stopPropagation();
             if (!confirm('确定要永久删除这个作品吗？删除后不可恢复。')) return;
+            var ossCfg = getOssConfig();
+            if (!ossCfg || typeof OSS === 'undefined') {
+                if (!confirm('⚠️ 当前未配置 OSS 云存储，删除操作只能在本机生效，其他电脑仍会看到该作品。\n\n确定仍要删除吗？')) return;
+            }
             videos = videos.filter(v => v.id !== id);
             markDeleted(id);
             saveVideos();
